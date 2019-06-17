@@ -15,8 +15,7 @@
           </text>
         </svg>
         <svg :width="svgWidth" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"
-             v-else-if="stage === 'playGame'" id="game"
-             v-on:click="playToken">
+             v-else-if="stage === 'playGame'" id="game">
           <line x1="33%" y1="100%" x2="33%" y2="0" stroke="black"></line>
           <line x1="67%" y1="100%" x2="67%" y2="0" stroke="black"></line>
 
@@ -82,6 +81,11 @@ export default {
       this.turn = 0;
 
       this.message = `It is ${this.tokens[this.turn]}'s turn`;
+      this.$nextTick(() => {
+        const svgGameElem = document.getElementById('game');
+        svgGameElem.addEventListener('click', this.playToken, true);
+      });
+    },
     },
     playToken(evt) {
       const svgGameElem = document.getElementById('game');
@@ -95,23 +99,11 @@ export default {
       const xIndex = Math.floor(svgCoordinates.x / 33);
       const yIndex = Math.floor(svgCoordinates.y / 33);
 
-      const gameNotOver = !this.someoneWon();
-      if (gameNotOver && this.board[yIndex][xIndex] === this.emptyToken) {
+      if (this.board[yIndex][xIndex] === this.emptyToken) {
         this.drawToken(xIndex, yIndex, this.tokens[this.turn]);
         this.board[yIndex][xIndex] = this.tokens[this.turn];
-        if (this.someoneWon()) {
-          this.message = `Game Over: ${this.tokens[this.turn]} has won!`;
-          this.drawGameOverScreen();
-          return;
-        }
-        if (this.tied()) {
-          this.message = 'The game has ended in a tie';
-          this.drawGameOverScreen();
-          return;
-        }
-        this.turn = (1 - this.turn);
-        this.message = `It is ${this.tokens[this.turn]}'s turn`;
-      } else if (gameNotOver) {
+        this.endTurn();
+      } else {
         this.message = 'Sorry, that is not a valid play!  Try again!';
       }
     },
@@ -143,6 +135,26 @@ export default {
       } else {
         this.message = `Unable to process ${token}`;
       }
+    },
+    endTurn() {
+      if (this.someoneWon()) {
+        const svgGameElem = document.getElementById('game');
+        svgGameElem.removeEventListener('click', this.playToken, true);
+
+        this.message = `Game Over: ${this.tokens[this.turn]} has won!`;
+        this.drawGameOverScreen();
+        return;
+      }
+      if (this.tied()) {
+        const svgGameElem = document.getElementById('game');
+        svgGameElem.removeEventListener('click', this.playToken, true);
+
+        this.message = 'The game has ended in a tie';
+        this.drawGameOverScreen();
+        return;
+      }
+      this.turn = (1 - this.turn);
+      this.message = `It is ${this.tokens[this.turn]}'s turn`;
     },
     drawGameOverScreen() {
       const svgGameElem = document.getElementById('game');
