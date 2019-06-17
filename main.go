@@ -1,29 +1,32 @@
 package main
 
 import (
-	"log"
-	"net/http"
+	"os"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
-	"github.com/lpar/gzipped"
+	"github.com/PGo-Projects/output"
+	"github.com/pchan37/tictactoe-goweb/internal/config"
+	"github.com/pchan37/tictactoe-goweb/internal/server"
+	"github.com/spf13/cobra"
 )
 
-func WithIndexAsDefault(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			r.URL.Path += "index.html"
-		}
-		h.ServeHTTP(w, r)
-	})
+var (
+	ServerCmd = &cobra.Command{
+		Use: "tictactoe-goweb",
+		Run: server.Run,
+	}
+)
+
+func init() {
+	ServerCmd.PersistentFlags().StringVar(&config.Filename, "config", "",
+		"config file (default is config.toml)")
+	ServerCmd.PersistentFlags().BoolVar(&config.DevRun, "dev", false,
+		"Run the server on a dev machine")
+	cobra.OnInitialize(config.Init)
 }
 
 func main() {
-	mux := chi.NewRouter()
-	mux.Use(middleware.Logger)
-
-	staticAssetPath := http.Dir("web/dist")
-	mux.Method(http.MethodGet, "/*", WithIndexAsDefault(gzipped.FileServer(staticAssetPath)))
-
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	if err := ServerCmd.Execute(); err != nil {
+		output.Error(err)
+		os.Exit(1)
+	}
 }
