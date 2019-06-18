@@ -45,7 +45,9 @@
       "plugin:vue/essential",
       "@vue/airbnb"
     ],
-    "rules": {},
+    "rules": {
+      "no-param-reassign": [2, { "props": false }]
+    },
     "parserOptions": {
       "parser": "babel-eslint"
     }

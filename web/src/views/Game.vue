@@ -3,18 +3,30 @@
     <v-layout row wrap align-center justify-space-between>
       <v-flex xs12>
         <svg :width="svgWidth" viewBox="0 0 99 99" xmlns="http://www.w3.org/2000/svg"
-             v-if="stage === 'chooseToken'">
+             v-if="stage === 'chooseOpponent'">
+          <text x="20%" y="33%" fill="blue" font-size="10">Play against?</text>
+          <text x="15%" y="67%" fill="black" font-size="10" class="menu-item"
+                @click="opponentChosen(human);">
+            Person
+          </text>
+          <text x="70%" y="67%" fill="black" font-size="10" class="menu-item"
+                @click="opponentChosen(ai);">
+            AI
+          </text>
+        </svg>
+        <svg :width="svgWidth" viewBox="0 0 99 99" xmlns="http://www.w3.org/2000/svg"
+             v-else-if="stage === 'chooseToken'">
           <text x="5" y="33%" fill="blue" font-size="10">Choose your token</text>
           <text x="30%" y="67%" fill="black" font-size="10" class="menu-item"
-                v-on:click="tokenChosen('X');">
+                @click="tokenChosen('X');">
             X
           </text>
           <text x="65%" y="67%" fill="black" font-size="10" class="menu-item"
-                v-on:click="tokenChosen('O');">
+                @click="tokenChosen('O');">
             O
           </text>
         </svg>
-        <svg :width="svgWidth" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"
+        <svg :width="svgWidth" viewBox="0 0 99 99" xmlns="http://www.w3.org/2000/svg"
              v-else-if="stage === 'playGame'" id="game">
           <line x1="33%" y1="100%" x2="33%" y2="0" stroke="black"></line>
           <line x1="67%" y1="100%" x2="67%" y2="0" stroke="black"></line>
@@ -35,12 +47,15 @@ export default {
   name: 'game',
   data() {
     return {
+      ai: 'AI',
       board: null,
       emptyToken: ' ',
-      tokens: null,
+      human: 'Human',
+      tokens: ['X', 'O'],
       turn: null,
       message: '',
-      stage: 'chooseToken',
+      opponent: {},
+      stage: 'chooseOpponent',
       windowWidth: window.innerWidth,
     };
   },
@@ -70,15 +85,34 @@ export default {
     },
   },
   methods: {
-    tokenChosen(token) {
+    setup() {
       this.board = [
         [this.emptyToken, this.emptyToken, this.emptyToken],
         [this.emptyToken, this.emptyToken, this.emptyToken],
         [this.emptyToken, this.emptyToken, this.emptyToken],
       ];
+    },
+    opponentChosen(opponent) {
+      this.opponent.isAi = (opponent === this.ai);
+      if (this.opponent.isAi && Math.random() < 0.5) {
+        this.turn = Math.floor(Math.random() * 2);
+        this.opponent.token = this.tokens[this.turn];
+        this.stage = 'playGame';
+        this.setup();
+        this.$nextTick(() => {
+          this.computerPlayToken();
+          const svgGameElem = document.getElementById('game');
+          svgGameElem.addEventListener('click', this.playToken, true);
+        });
+      } else {
+        this.stage = 'chooseToken';
+      }
+    },
+    tokenChosen(token) {
       this.stage = 'playGame';
-      this.tokens = [token, (token === 'X') ? 'O' : 'X'];
-      this.turn = 0;
+      this.setup();
+      this.turn = (token === this.tokens[0]) ? 0 : 1;
+      this.opponent.token = this.tokens[1 - this.turn];
 
       this.message = `It is ${this.tokens[this.turn]}'s turn`;
       this.$nextTick(() => {
@@ -87,17 +121,48 @@ export default {
       });
     },
     computerPlayToken() {
-      let xIndex = 0;
-      let yIndex = 0;
-      while (this.board[yIndex][xIndex] !== this.emptyToken) {
-        const randomInt = Math.floor(Math.random() * 9);
-        xIndex = Math.floor(randomInt / 3);
-        yIndex = randomInt % 3;
+      const [, bestMove] = this.minimax(this.board, this.turn, this.turn, 0);
+
+      this.drawToken(bestMove[1], bestMove[0], this.tokens[this.turn]);
+      this.board[bestMove[0]][bestMove[1]] = this.tokens[this.turn];
+      this.endTurn();
+    },
+    minimax(board, initialTurn, turn, depth) {
+      // check if game is over
+      if (this.tied()) {
+        return [0 - depth, null];
+      }
+      if (this.someoneWon()) {
+        return (turn !== initialTurn) ? [Number.MAX_SAFE_INTEGER - depth, null]
+          : [Number.MIN_SAFE_INTEGER + depth, null];
       }
 
-      this.drawToken(xIndex, yIndex, this.tokens[this.turn]);
-      this.board[yIndex][xIndex] = this.tokens[this.turn];
-      this.endTurn();
+      // get available moves
+      const moves = [];
+      const scores = [];
+      for (let i = 0; i < 3; i += 1) {
+        for (let j = 0; j < 3; j += 1) {
+          if (board[i][j] === this.emptyToken) {
+            moves.push([i, j]);
+          }
+        }
+      }
+
+      // play each available move and evaluate for a score
+      moves.forEach((move) => {
+        board[move[0]][move[1]] = this.tokens[turn];
+        const [score] = this.minimax(board, initialTurn, 1 - turn, depth + 1);
+        scores.push(score);
+        board[move[0]][move[1]] = this.emptyToken;
+      });
+      // return the best move
+      this.shuffle(scores, moves);
+      if (turn === initialTurn) {
+        const bestScoreIndex = scores.indexOf(Math.max(...scores));
+        return [scores[bestScoreIndex], moves[bestScoreIndex]];
+      }
+      const worstScoreIndex = scores.indexOf(Math.min(...scores));
+      return [scores[worstScoreIndex], moves[worstScoreIndex]];
     },
     playToken(evt) {
       const svgGameElem = document.getElementById('game');
@@ -167,7 +232,7 @@ export default {
       }
       this.turn = (1 - this.turn);
       this.message = `It is ${this.tokens[this.turn]}'s turn`;
-      if (this.tokens[this.turn] !== 'X') {
+      if (this.tokens[this.turn] === this.opponent.token && this.opponent.isAi) {
         this.computerPlayToken();
       }
     },
@@ -200,7 +265,7 @@ export default {
           svgGameElement.removeChild(svgGameElement.lastChild);
         }
         this.message = '';
-        this.stage = 'chooseToken';
+        this.stage = 'chooseOpponent';
       });
       svgGameElem.append(yes);
 
@@ -239,6 +304,23 @@ export default {
         }
       }
       return boardFilled && !this.someoneWon();
+    },
+    shuffle(arrayOne, arrayTwo) {
+      let index = arrayOne.length;
+      let randomIndex;
+      let tempOne;
+      let tempTwo;
+
+      while (index) {
+        randomIndex = Math.floor(Math.random() * index);
+        index -= 1;
+        tempOne = arrayOne[index];
+        tempTwo = arrayTwo[index];
+        arrayOne[index] = arrayOne[randomIndex];
+        arrayTwo[index] = arrayTwo[randomIndex];
+        arrayOne[randomIndex] = tempOne;
+        arrayTwo[randomIndex] = tempTwo;
+      }
     },
   },
 };
