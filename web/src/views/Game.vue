@@ -86,6 +86,18 @@ export default {
         svgGameElem.addEventListener('click', this.playToken, true);
       });
     },
+    computerPlayToken() {
+      let xIndex = 0;
+      let yIndex = 0;
+      while (this.board[yIndex][xIndex] !== this.emptyToken) {
+        const randomInt = Math.floor(Math.random() * 9);
+        xIndex = Math.floor(randomInt / 3);
+        yIndex = randomInt % 3;
+      }
+
+      this.drawToken(xIndex, yIndex, this.tokens[this.turn]);
+      this.board[yIndex][xIndex] = this.tokens[this.turn];
+      this.endTurn();
     },
     playToken(evt) {
       const svgGameElem = document.getElementById('game');
@@ -155,9 +167,13 @@ export default {
       }
       this.turn = (1 - this.turn);
       this.message = `It is ${this.tokens[this.turn]}'s turn`;
+      if (this.tokens[this.turn] !== 'X') {
+        this.computerPlayToken();
+      }
     },
     drawGameOverScreen() {
       const svgGameElem = document.getElementById('game');
+
       const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       overlay.setAttributeNS(null, 'width', '100%');
       overlay.setAttributeNS(null, 'height', '100%');
